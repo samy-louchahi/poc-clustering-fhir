@@ -124,7 +124,6 @@ def plot_2d_clusters(X: np.ndarray,
     # Project to 2D if needed
     if X.shape[1] > 2:
         if method == 'tsne':
-            from sklearn.manifold import TSNE
             projector = TSNE(n_components=2, random_state=42)
             X_2d = projector.fit_transform(X)
         else:  # pca

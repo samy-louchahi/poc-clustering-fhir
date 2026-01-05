@@ -61,10 +61,14 @@ class PatientClusterer:
             eps = self.kwargs.get('eps', 0.5)
             min_samples = self.kwargs.get('min_samples', 5)
             
+            # Filter out handled parameters
+            extra_kwargs = {k: v for k, v in self.kwargs.items() 
+                          if k not in ['eps', 'min_samples']}
+            
             self.clusterer = DBSCAN(
                 eps=eps,
                 min_samples=min_samples,
-                **{k: v for k, v in self.kwargs.items() if k not in ['eps', 'min_samples']}
+                **extra_kwargs
             )
             self.labels_ = self.clusterer.fit_predict(X)
             
@@ -75,11 +79,14 @@ class PatientClusterer:
             min_cluster_size = self.kwargs.get('min_cluster_size', 5)
             min_samples = self.kwargs.get('min_samples', None)
             
+            # Filter out handled parameters
+            extra_kwargs = {k: v for k, v in self.kwargs.items() 
+                          if k not in ['min_cluster_size', 'min_samples']}
+            
             self.clusterer = hdbscan.HDBSCAN(
                 min_cluster_size=min_cluster_size,
                 min_samples=min_samples,
-                **{k: v for k, v in self.kwargs.items() 
-                   if k not in ['min_cluster_size', 'min_samples']}
+                **extra_kwargs
             )
             self.labels_ = self.clusterer.fit_predict(X)
             

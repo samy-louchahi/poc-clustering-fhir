@@ -37,7 +37,7 @@ class ClusterInterpreter:
         Args:
             cluster_labels: Cluster assignment for each patient
             top_n: Number of top codes to return per cluster
-            method: Method to rank codes ('frequency', 'tfidf', 'distintiveness')
+            method: Method to rank codes ('frequency', 'tfidf', 'distinctiveness')
             
         Returns:
             Dictionary mapping cluster_id to list of (code, score) tuples

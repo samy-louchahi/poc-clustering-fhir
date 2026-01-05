@@ -242,7 +242,7 @@ data = [
 
 ## Future Enhancements
 
-- [ ] Visualization utilities (t-SNE, UMAP plots)
+- [ ] t-SNE/UMAP integration for 2D visualization
 - [ ] Cross-validation and cluster stability metrics
 - [ ] Integration with FHIR servers
 - [ ] Support for temporal patterns

@@ -107,8 +107,13 @@ def test_clustering():
     builder = PatientCodeMatrix(patients)
     matrix = builder.build_matrix()
     
+    # Use sparse matrix directly with a compatible algorithm
+    from fhir_clustering.dimensionality_reduction import DimensionalityReducer
+    reducer = DimensionalityReducer(method='svd', n_components=2)
+    reduced = reducer.fit_transform(matrix)
+    
     clusterer = PatientClusterer(method='kmeans', n_clusters=2)
-    labels = clusterer.fit_predict(matrix.toarray())
+    labels = clusterer.fit_predict(reduced)
     
     assert len(labels) == 20
     assert clusterer.get_n_clusters() <= 2
