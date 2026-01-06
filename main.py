@@ -32,7 +32,7 @@ def main():
         include_systems=[CodeSystem.SNOMED, CodeSystem.LOINC, CodeSystem.RXNORM],
         apply_tfidf=True,              # Réduit le poids des codes trop fréquents (ex: "Routine checkup")
         dimensionality_reduction='svd',# Indispensable pour la sparsité
-        n_components=50,               # Réduire à 50 dimensions
+        n_components=30,               # Réduire à 30 dimensions
         clustering_method='kmeans',    # Ou 'dbscan' pour détection auto
         n_clusters=N_CLUSTERS
     )
