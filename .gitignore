@@ -209,3 +209,5 @@ __marimo__/
 # Project specific
 plots/
 *.png
+data/
+results/
