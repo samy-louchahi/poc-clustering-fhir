@@ -5,7 +5,7 @@ using shared preprocessing (TF-IDF + SVD) to compare key metrics.
 Run with: python compare_clustering_methods.py
 Outputs CSV and console summary in results/clustering_benchmark.
 """
-
+print("has started ")
 import os
 import time
 import numpy as np
@@ -21,7 +21,6 @@ from sklearn.metrics import (
 from fhir_clustering.fhir_parser import FHIRParser
 from fhir_clustering.pipeline import FHIRClusteringPipeline
 from fhir_clustering.data_structures import CodeSystem
-from fhir_clustering.clustering import HDBSCAN_AVAILABLE
 
 
 DATA_DIR = "data"
@@ -68,10 +67,17 @@ def _safe_metric(metric_fn, X: np.ndarray, labels: np.ndarray) -> Optional[float
         return float(metric_fn(X[mask], filtered_labels))
     except Exception:
         return None
-
+    
+def _has_hdbscan() -> bool:
+    try:
+        import hdbscan  
+        return True
+    except Exception:
+        return False
 
 def run_benchmark() -> pd.DataFrame:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    HDBSCAN_AVAILABLE = _has_hdbscan()
 
     patients = FHIRParser.load_directory(DATA_DIR)
     if not patients:
