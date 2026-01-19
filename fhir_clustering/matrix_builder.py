@@ -137,3 +137,48 @@ class PatientCodeMatrix:
             'sparsity': sparsity,
             'avg_codes_per_patient': n_nonzero / n_patients if n_patients > 0 else 0,
         }
+    
+    def filter_features(self, min_df: float = 0.0, max_df: float = 1.0):
+        """
+        Filtre les codes selon leur fréquence d'apparition.
+        min_df: Fréquence minimale (ex: 0.01 pour 1%). Si int > 1, c'est un nombre absolu.
+        max_df: Fréquence maximale (ex: 0.9 pour 90%).
+        """
+        if self.matrix is None:
+            raise ValueError("Matrix not built yet.")
+
+        n_patients = self.matrix.shape[0]
+        
+        # Conversion des seuils relatifs (%) en absolus
+        min_count = int(min_df * n_patients) if isinstance(min_df, float) and min_df < 1.0 else int(min_df)
+        max_count = int(max_df * n_patients) if isinstance(max_df, float) and max_df < 1.0 else int(max_df)
+        
+        print(f"Filtrage des features: conservation si présence entre {min_count} et {max_count} patients.")
+
+        # Calcul de la fréquence documentaire (nombre de patients ayant le code)
+        # On binarise temporairement pour ne compter qu'une fois par patient
+        binary_matrix = self.matrix.copy()
+        binary_matrix.data[:] = 1
+        doc_freqs = np.array(binary_matrix.sum(axis=0)).flatten()
+        
+        # Création du masque de conservation
+        mask = (doc_freqs >= min_count) & (doc_freqs <= max_count)
+        
+        # Application du filtre sur la matrice
+        old_shape = self.matrix.shape
+        self.matrix = self.matrix[:, mask]
+        
+        # RECONSTRUCTION DES MAPPINGS (Crucial pour l'interprétation)
+        kept_indices = np.where(mask)[0]
+        new_idx_to_code = {}
+        new_code_to_idx = {}
+        
+        for new_idx, old_idx in enumerate(kept_indices):
+            code_obj = self.idx_to_code[old_idx]
+            new_idx_to_code[new_idx] = code_obj
+            new_code_to_idx[str(code_obj)] = new_idx
+            
+        self.idx_to_code = new_idx_to_code
+        self.code_to_idx = new_code_to_idx
+        
+        print(f"Features réduites : {old_shape[1]} -> {self.matrix.shape[1]}")

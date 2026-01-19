@@ -34,7 +34,9 @@ def main():
         dimensionality_reduction='svd',# Indispensable pour la sparsité
         n_components=30,               # Réduire à 30 dimensions
         clustering_method='kmeans',    # Ou 'dbscan' pour détection auto
-        n_clusters=N_CLUSTERS
+        n_clusters=N_CLUSTERS,
+        min_df=0.01,                   # Filtrer les codes présents dans moins de 1% des patients
+        max_df=0.9                     # Filtrer les codes présents dans plus de 90
     )
 
     # Entraînement

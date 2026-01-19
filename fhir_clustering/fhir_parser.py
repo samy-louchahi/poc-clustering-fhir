@@ -1,6 +1,7 @@
 import json
 import glob
 import os
+from datetime import datetime
 from typing import List, Dict
 from .data_structures import PatientRecord, MedicalCode, CodeSystem
 
@@ -22,6 +23,30 @@ class FHIRParser:
         
         record = PatientRecord(patient_id=patient_id)
         
+        gender = patient_resource.get('gender')
+        if gender:
+            record.add_code(MedicalCode(
+                code=f"GENDER_{gender.upper()}",
+                system=CodeSystem.DEMOGRAPHICS,
+                display=f"Gender: {gender}"
+            ))
+        
+        birth_date = patient_resource.get('birthDate')
+        if birth_date:
+            try:
+                birth_year = int(birth_date.split('-')[0])
+                # On fixe l'année de référence (ex: 2026) pour que le résultat soit reproductible
+                age = 2026 - birth_year
+                
+                # Création de buckets d'âge (0-10, 10-20, etc.)
+                age_bucket = (age // 10) * 10
+                record.add_code(MedicalCode(
+                    code=f"AGE_{age_bucket}_{age_bucket+10}",
+                    system=CodeSystem.DEMOGRAPHICS,
+                    display=f"Age Group: {age_bucket}-{age_bucket+10}"
+                ))
+            except Exception:
+                pass
         # 2. Scanner les ressources cliniques pour extraire les codes
         for entry in entries:
             resource = entry.get('resource', {})

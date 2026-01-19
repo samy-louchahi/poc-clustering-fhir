@@ -26,7 +26,9 @@ class FHIRClusteringPipeline:
                  dimensionality_reduction: Optional[str] = 'svd',
                  n_components: int = 50,
                  clustering_method: str = 'kmeans',
-                 n_clusters: Optional[int] = None):
+                 n_clusters: Optional[int] = None,
+                 min_df: float = 0.0,
+                 max_df: float = 1.0):
         """
         Initialize clustering pipeline.
         
@@ -37,6 +39,8 @@ class FHIRClusteringPipeline:
             n_components: Number of components for dimensionality reduction
             clustering_method: Clustering algorithm ('kmeans', 'dbscan', 'hdbscan')
             n_clusters: Number of clusters (for KMeans)
+            min_df: Minimum document frequency for feature filtering
+            max_df: Maximum document frequency for feature filtering
         """
         self.include_systems = include_systems
         self.apply_tfidf = apply_tfidf
@@ -44,6 +48,8 @@ class FHIRClusteringPipeline:
         self.n_components = n_components
         self.clustering_method = clustering_method
         self.n_clusters = n_clusters
+        self.min_df = min_df
+        self.max_df = max_df
         
         # Components
         self.matrix_builder: Optional[PatientCodeMatrix] = None
@@ -76,6 +82,9 @@ class FHIRClusteringPipeline:
             include_systems=self.include_systems
         )
         self.original_matrix = self.matrix_builder.build_matrix()
+        if self.min_df > 0 or self.max_df < 1.0:
+            self.matrix_builder.filter_features(self.min_df, self.max_df)
+            self.original_matrix = self.matrix_builder.get_matrix()
         stats = self.matrix_builder.get_matrix_stats()
         print(f"Matrix shape: {stats['n_patients']} patients × {stats['n_codes']} codes")
         print(f"Sparsity: {stats['sparsity']:.2%}")

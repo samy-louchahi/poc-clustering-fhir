@@ -12,6 +12,7 @@ class CodeSystem(Enum):
     SNOMED = "SNOMED"
     LOINC = "LOINC"
     RXNORM = "RxNorm"
+    DEMOGRAPHICS = "Demographics"
 
 
 @dataclass
