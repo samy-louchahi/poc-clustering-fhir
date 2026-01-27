@@ -211,3 +211,4 @@ plots/
 *.png
 data/
 results/
+terminology_omop/
