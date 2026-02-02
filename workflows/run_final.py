@@ -344,7 +344,8 @@ def run_final(
     apply_tfidf = bool(cfg.get("apply_tfidf", True))
     n_components = int(cfg.get("n_components", 30))
     dim_reduction = cfg.get("dimensionality_reduction", "svd")
-
+    min_df = float(cfg.get("min_df", 0.01))
+    max_df = float(cfg.get("max_df", 0.90))
     k_opt = int(chosen_k["k_opt"])
     mcs = int(chosen_hdb["min_cluster_size_opt"])
     ms = chosen_hdb.get("min_samples_opt", None)
@@ -377,6 +378,8 @@ def run_final(
             n_components=n_components,
             clustering_method="kmeans",
             n_clusters=k_opt,
+            min_df=min_df,
+            max_df=max_df,
         )
         pipe_k.fit(patients)
 
@@ -407,6 +410,8 @@ def run_final(
             n_components=n_components,
             clustering_method="hdbscan",
             n_clusters=None,
+            min_df=min_df,
+            max_df=max_df,
         )
         pipe_h.fit(patients, min_cluster_size=mcs, min_samples=ms)
 

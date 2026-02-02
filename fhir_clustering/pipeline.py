@@ -26,7 +26,9 @@ class FHIRClusteringPipeline:
                  dimensionality_reduction: Optional[str] = 'svd',
                  n_components: int = 50,
                  clustering_method: str = 'kmeans',
-                 n_clusters: Optional[int] = None):
+                 n_clusters: Optional[int] = None,
+                 min_df: float = 0.0,
+                 max_df: float = 1.0):
         """
         Initialize clustering pipeline.
         
@@ -37,6 +39,8 @@ class FHIRClusteringPipeline:
             n_components: Number of components for dimensionality reduction
             clustering_method: Clustering algorithm ('kmeans', 'dbscan', 'hdbscan')
             n_clusters: Number of clusters (for KMeans)
+            min_df: Minimum document frequency (e.g. 0.01 for 1%)
+            max_df: Maximum document frequency (e.g. 0.90 to remove generic parents)
         """
         self.include_systems = include_systems
         self.apply_tfidf = apply_tfidf
@@ -44,6 +48,8 @@ class FHIRClusteringPipeline:
         self.n_components = n_components
         self.clustering_method = clustering_method
         self.n_clusters = n_clusters
+        self.min_df = min_df
+        self.max_df = max_df
         
         # Components
         self.matrix_builder: Optional[PatientCodeMatrix] = None
@@ -77,14 +83,48 @@ class FHIRClusteringPipeline:
         )
         self.original_matrix = self.matrix_builder.build_matrix()
         stats = self.matrix_builder.get_matrix_stats()
-        print(f"Matrix shape: {stats['n_patients']} patients × {stats['n_codes']} codes")
+        print(f"Matrix shape (raw): {stats['n_patients']} patients × {stats['n_codes']} codes")
         print(f"Sparsity: {stats['sparsity']:.2%}")
         
-        # Step 2: Feature transformation
+        # Step 1.5: Feature Selection (Filtering)
+        # We instantiate the transformer early to use its filtering capabilities
+        self.feature_transformer = FeatureTransformer()
+        
+        if self.min_df > 0.0 or self.max_df < 1.0:
+            print(f"Applying feature selection (min_df={self.min_df}, max_df={self.max_df})...")
+            
+            # 1. Calculate mask based on frequency
+            mask = self.feature_transformer.calculate_frequency_mask(
+                self.original_matrix,
+                min_df=self.min_df,
+                max_df=self.max_df
+            )
+            
+            # 2. Filter the matrix columns
+            self.original_matrix = self.feature_transformer.apply_feature_selection(self.original_matrix)
+            
+            # 3. CRITICAL: Update MatrixBuilder mappings to match new matrix columns
+            # We must map the old column indices to the new shifted indices
+            kept_indices = np.where(mask)[0]
+            new_idx_to_code = {}
+            new_code_to_idx = {}
+            
+            for new_idx, old_idx in enumerate(kept_indices):
+                code_obj = self.matrix_builder.idx_to_code[old_idx]
+                new_idx_to_code[new_idx] = code_obj
+                new_code_to_idx[str(code_obj)] = new_idx
+            
+            # Overwrite internal state of matrix_builder so interpretation works
+            self.matrix_builder.idx_to_code = new_idx_to_code
+            self.matrix_builder.code_to_idx = new_code_to_idx
+            
+            print(f"Matrix shape (filtered): {self.original_matrix.shape[0]} patients × {self.original_matrix.shape[1]} codes")
+
+        # Step 2: Feature transformation (TF-IDF)
         self.transformed_matrix = self.original_matrix
         if self.apply_tfidf:
             print(f"Applying TF-IDF transformation...")
-            self.feature_transformer = FeatureTransformer()
+            # Use the already instantiated transformer
             self.transformed_matrix = self.feature_transformer.apply_tfidf(
                 self.original_matrix
             )
@@ -99,7 +139,8 @@ class FHIRClusteringPipeline:
             )
             self.reduced_data = self.dim_reducer.fit_transform(self.transformed_matrix)
             explained_var = self.dim_reducer.get_cumulative_variance()
-            print(f"Explained variance: {explained_var[-1]:.2%}")
+            if len(explained_var) > 0:
+                print(f"Explained variance: {explained_var[-1]:.2%}")
             clustering_input = self.reduced_data
         
         # Step 4: Clustering
@@ -124,7 +165,7 @@ class FHIRClusteringPipeline:
         return self
     
     def get_top_codes_per_cluster(self, top_n: int = 10, 
-                                   method: str = 'frequency') -> Dict:
+                                  method: str = 'frequency') -> Dict:
         """
         Get top medical codes characterizing each cluster.
         
