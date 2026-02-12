@@ -45,6 +45,17 @@ OMOP_RXNORM = "RxNorm"
 
 logger = logging.getLogger(__name__)
 
+GENERIC_ROOTS = {
+    "138875005",  # SNOMED CT Concept (Root)
+    "404684003",  # Clinical finding (finding)
+    "64572001",   # Disease (disorder) - Le parent de toutes les maladies
+    "71388002",   # Procedure (procedure)
+    "243796009",  # Situation with explicit context (situation)
+    "272379006",  # Event (event)
+    "123037004",  # Body structure (body structure)
+    "413350009",  # Finding with explicit context
+}
+
 @dataclass
 class TerminologyLayer:
     # system+code -> concept_id
@@ -61,6 +72,36 @@ class TerminologyLayer:
 
 def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
+def get_ancestors(self, code: str) -> set:
+        """
+        Récupère tous les ancêtres d'un code, en s'arrêtant aux racines génériques.
+        """
+        if code not in self.graph:
+            return set()
+            
+        ancestors = set()
+        
+        # Utilisation de NetworkX pour obtenir les ancêtres
+        # self.graph est un DiGraph où A -> B signifie "A est un B" (A child of B)
+        # Donc on cherche les successeurs ou on traverse
+        
+        try:
+            # On récupère tous les noeuds accessibles (parents, grands-parents...)
+            # Note: Vérifiez le sens de vos arêtes. Si Child->Parent, c'est descendants (au sens graph)
+            # Si Parent->Child, c'est ancestors (au sens graph).
+            # Supposons ici que vous avez construit Child -> Parent.
+            raw_ancestors = nx.descendants(self.graph, code) 
+            
+            # FILTRAGE AVEC LA STOP-LIST
+            for anc in raw_ancestors:
+                if anc not in GENERIC_ROOTS:
+                    ancestors.add(anc)
+                    
+        except nx.NetworkXError:
+            pass
+            
+        return ancestors
 
 
 def _detect_sep(path: str) -> str:

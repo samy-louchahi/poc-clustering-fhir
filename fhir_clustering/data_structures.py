@@ -20,14 +20,15 @@ class MedicalCode:
     code: str
     system: CodeSystem
     display: str = ""
+    weight: float = 1.0  
     
     def __hash__(self):
-        return hash((self.code, self.system))
+        return hash((self.code, self.system, self.weight))
     
     def __eq__(self, other):
         if not isinstance(other, MedicalCode):
             return False
-        return self.code == other.code and self.system == other.system
+        return self.code == other.code and self.system == other.system and self.weight == other.weight
     
     def __str__(self):
         return f"{self.system.value}:{self.code}"
@@ -38,6 +39,8 @@ class PatientRecord:
     """Represents a patient with their medical codes."""
     patient_id: str
     codes: List[MedicalCode] = field(default_factory=list)
+    age: float = 0.0
+    gender: int = 0  # 0 for female/unknown, 1 for male (simplification pour calcul)
     metadata: Dict = field(default_factory=dict)
     
     def add_code(self, code: MedicalCode):

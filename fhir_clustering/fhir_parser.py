@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import glob
 import os
@@ -20,38 +21,55 @@ class FHIRParser:
 
         entries = data.get("entry", [])
 
-        # Find Patient resource safely
+        # 1. Find Patient resource safely
         patient_resource = None
         for e in entries:
             res = e.get("resource")
             if res and res.get("resourceType") == "Patient":
                 patient_resource = res
                 break
+        
+        # 2. Extract Demographics (ID, Age, Gender)
+        patient_id = os.path.basename(file_path) # Valeur par défaut
+        age = 0.0
+        gender = 0
 
-        patient_id = patient_resource.get("id") if patient_resource else os.path.basename(file_path)
-        record = PatientRecord(patient_id=patient_id)
+        if patient_resource:
+            patient_id = patient_resource.get("id", patient_id)
+            
+            # Extraction des données brutes
+            birth_date = patient_resource.get("birthDate", "")
+            gender_str = patient_resource.get("gender", "")
+            
+            # Conversion via les utilitaires
+            age = FHIRParser._calculate_age(birth_date)
+            gender = FHIRParser._parse_gender(gender_str)
 
-        # Extract codes from relevant resource types
+        # 3. Initialize Record with new fields
+        # Note: Assurez-vous d'avoir mis à jour data_structures.py pour accepter age/gender
+        record = PatientRecord(patient_id=patient_id, age=age, gender=gender)
+
+        # 4. Extract codes from relevant resource types (Code existant inchangé)
         for entry in entries:
             resource = entry.get("resource", {})
             res_type = resource.get("resourceType")
 
             # CONDITIONS & PROCEDURES (SNOMED)
             if res_type in ["Condition", "Procedure", "Encounter"]:
-                FHIRParser._extract_codes(resource, record, CodeSystem.SNOMED, ["snomed.info"])
+                FHIRParser._extract_codes(resource, record, CodeSystem.SNOMED, ["snomed.info"], weight=1.5)
 
             # OBSERVATIONS (LOINC)
             elif res_type == "Observation":
-                FHIRParser._extract_codes(resource, record, CodeSystem.LOINC, ["loinc.org"])
+                FHIRParser._extract_codes(resource, record, CodeSystem.LOINC, ["loinc.org"], weight=0.8)
 
             # MEDICATIONS (RxNorm)
             elif res_type == "Medication":
-                FHIRParser._extract_codes(resource, record, CodeSystem.RXNORM, ["rxnorm", "nlm.nih.gov"])
+                FHIRParser._extract_codes(resource, record, CodeSystem.RXNORM, ["rxnorm", "nlm.nih.gov"], weight=1.0)
 
         return record
 
     @staticmethod
-    def _extract_codes(resource: Dict, record: PatientRecord, target_system: CodeSystem, url_keywords: List[str]):
+    def _extract_codes(resource: Dict, record: PatientRecord, target_system: CodeSystem, url_keywords: List[str], weight: float = 1.0):
         """
         Extract codings matching a specific system.
         Codes can be under 'code', or sometimes 'type'/'vaccineCode'.
@@ -71,7 +89,27 @@ class FHIRParser:
                 code_val = coding.get("code")
                 display = coding.get("display", "Unknown")
                 if code_val:
-                    record.add_code(MedicalCode(code=str(code_val), system=target_system, display=display))
+                    m_code = MedicalCode(code=str(code_val), system=target_system, display=display, weight=weight)
+                    record.add_code(m_code)
+    
+
+    @staticmethod
+    def _calculate_age(birth_date_str: str) -> float:
+        """Calcule l'âge approximatif à partir de la date de naissance."""
+        if not birth_date_str:
+            return 0.0
+        try:
+            # Format FHIR standard : YYYY-MM-DD
+            birth = datetime.strptime(birth_date_str, "%Y-%m-%d")
+            today = datetime.now()
+            return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+        except ValueError:
+            return 0.0
+
+    @staticmethod
+    def _parse_gender(gender_str: str) -> int:
+        """Encode le genre : Male=1, Autre=0."""
+        return 1 if gender_str and gender_str.lower() == 'male' else 0
 
     @staticmethod
     def load_directory(directory_path: str, use_cache: bool = True) -> List[PatientRecord]:

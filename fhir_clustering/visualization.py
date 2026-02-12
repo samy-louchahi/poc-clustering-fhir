@@ -259,6 +259,75 @@ def plot_cluster_comparison(cluster_summary: pd.DataFrame,
     return fig
 
 
+def plot_biplot(pipeline, ax=None, top_n_arrows=10):
+    """
+    Affiche un Biplot : Nuage de points (Patients) + Vecteurs (Codes).
+    Ne fonctionne que si la réduction est linéaire (SVD/PCA).
+    """
+    # Vérification
+    reducer = pipeline.dim_reducer
+    if reducer.method not in ['svd', 'pca']:
+        print(f"Biplot impossible avec {reducer.method} (nécessite SVD ou PCA).")
+        return
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+    # 1. Récupérer les "Loadings" (Poids des features dans les composantes)
+    # Shape: (n_components, n_features)
+    components = reducer.get_components()  # SVD: .components_, PCA: .components_ (même nom)
+    
+    # On regarde seulement PC1 (x) et PC2 (y)
+    # components[0] est le vecteur PC1
+    pc1_loadings = components[0]
+    pc2_loadings = components[1]
+    
+    feature_names = pipeline.matrix_builder.get_feature_names()
+    
+    # 2. Sélectionner les features les plus influentes
+    # On calcule la "longueur" du vecteur (magnitude)
+    magnitudes = pc1_loadings**2 + pc2_loadings**2
+    
+    # On prend les indices des N plus grands vecteurs
+    top_indices = np.argsort(magnitudes)[-top_n_arrows:]
+    
+    # 3. Facteur d'échelle pour l'affichage
+    # Les loadings sont petits (ex: 0.1), les points projetés sont grands (ex: 5.0)
+    # On scale les flèches pour qu'elles soient visibles par rapport aux points
+    # (Astuce: on prend le max des données projetées)
+    X_reduced = pipeline.reduced_data
+    scale_x = np.max(np.abs(X_reduced[:, 0])) 
+    scale_y = np.max(np.abs(X_reduced[:, 1]))
+    # On multiplie par un facteur arbitraire (ex: 0.8) pour que ça ne dépasse pas trop
+    scaling_factor = min(scale_x, scale_y) * 0.8 
+
+    # 4. Tracer les points (Patients) - En gris discret
+    ax.scatter(X_reduced[:, 0], X_reduced[:, 1], alpha=0.2, c='gray', s=5, label='Patients')
+
+    # 5. Tracer les flèches (Features)
+    for i in top_indices:
+        # Direction brute
+        vec_x = pc1_loadings[i]
+        vec_y = pc2_loadings[i]
+        
+        # Direction scalée pour l'affichage
+        plot_x = vec_x * scaling_factor * 5 # x5 car les loadings sont souvent très petits en haute dim
+        plot_y = vec_y * scaling_factor * 5
+        
+        feature_name = feature_names[i]
+        
+        # Flèche rouge
+        ax.arrow(0, 0, plot_x, plot_y, color='red', alpha=0.8, head_width=scale_x*0.02)
+        
+        # Texte (un peu décalé pour lisibilité)
+        ax.text(plot_x * 1.1, plot_y * 1.1, feature_name, color='darkred', fontsize=9, weight='bold')
+
+    ax.set_xlabel("Dimension 1 (PC1)")
+    ax.set_ylabel("Dimension 2 (PC2)")
+    ax.set_title(f"Biplot SVD - Top {top_n_arrows} Features influentes")
+    ax.grid(True, alpha=0.3)
+
+
 def save_all_plots(pipeline, output_dir: str = 'plots'):
     """
     Generate and save all available plots for a fitted pipeline.
