@@ -10,8 +10,10 @@ Serious clustering benchmark (KMeans / DBSCAN / HDBSCAN)
 Outputs:
 - results/serious_benchmark/summary.csv  (aggregated)
 - results/serious_benchmark/runs.csv     (per-run details)
+- results/serious_benchmark/benchmark_metrics_comparison.png (visual plot)
 """
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 import os
 import time
 import math
@@ -71,6 +73,60 @@ def _safe_metric(metric_fn, X: np.ndarray, labels: np.ndarray) -> Optional[float
         return float(metric_fn(X[mask], y))
     except Exception:
         return None
+
+
+def plot_benchmark_results(summary_df, output_dir):
+    """
+    Génère des graphiques comparatifs (Bar Charts) pour les métriques.
+    Adapté aux colonnes du summary_df généré par ce script.
+    """
+    # Configuration du style
+    sns.set_theme(style="whitegrid")
+    
+    # Mapping: (Nom Colonne DataFrame, Titre Graphique, Description)
+    metrics_to_plot = [
+        ("full_silhouette_mean", "Silhouette Score", "Plus haut est mieux"),
+        ("full_calinski_harabasz_mean", "Calinski-Harabasz", "Plus haut est mieux"),
+        ("full_davies_bouldin_mean", "Davies-Bouldin", "Plus bas est mieux"),
+        ("full_runtime_sec_mean", "Runtime (s)", "Plus bas est mieux")
+    ]
+    
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle("Comparatif des Algorithmes de Clustering (Données Réelles)", fontsize=16)
+    
+    axes = axes.flatten()
+    
+    for i, (col_name, title, description) in enumerate(metrics_to_plot):
+        ax = axes[i]
+        
+        # Vérification si la métrique est disponible (pas que des NaN/None)
+        if col_name in summary_df.columns and not summary_df[col_name].isnull().all():
+            # Barplot
+            sns.barplot(
+                data=summary_df, 
+                x="method", # Notez la minuscule 'method' comme dans votre dict
+                y=col_name, 
+                hue="method", 
+                ax=ax, 
+                palette="viridis",
+                legend=False
+            )
+            
+            ax.set_title(f"{title}\n({description})")
+            ax.set_xlabel("")
+            ax.set_ylabel("") # On enlève le label Y car redondant avec le titre
+            
+            # Ajout des valeurs sur les barres
+            for container in ax.containers:
+                ax.bar_label(container, fmt='%.2f')
+        else:
+            ax.text(0.5, 0.5, "Données non disponibles", ha='center', va='center')
+            ax.set_title(title)
+
+    plt.tight_layout()
+    output_path = os.path.join(output_dir, "benchmark_metrics_comparison.png")
+    plt.savefig(output_path, dpi=300)
+    print(f"Graphique comparatif sauvegardé : {output_path}")
 
 
 def _centroid_stats(X: np.ndarray, labels: np.ndarray) -> Tuple[Optional[float], Optional[float], Optional[float]]:
@@ -332,6 +388,11 @@ def main():
     print(f"\nSaved: {OUTPUT_DIR}/runs.csv")
     print(f"Saved: {OUTPUT_DIR}/summary.csv\n")
     print(df_summary)
+
+    # --- Plotting the results ---
+    plot_benchmark_results(df_summary, OUTPUT_DIR)
+    
+    print("\nBenchmark completed!")
 
 
 if __name__ == "__main__":
